@@ -39,6 +39,3 @@ jupyter lab
 
 Transformer architecture, MoE and pruning experiments require distinct environments because their PyTorch/CUDA and package constraints differ. See [`requirements/README.md`](requirements/README.md).
 
-
-Before a public release, review [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md), replace machine-specific data paths, add the final paper citation/DOI, and choose a license for the authors' code. No repository-wide license has been assigned in this draft.
-
