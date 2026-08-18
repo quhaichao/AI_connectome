@@ -39,12 +39,6 @@ jupyter lab
 
 Transformer architecture, MoE and pruning experiments require distinct environments because their PyTorch/CUDA and package constraints differ. See [`requirements/README.md`](requirements/README.md).
 
-## Release policy
-
-- The analysis code was copied byte-for-byte from the active `FC-IS_code` source tree. Only destination paths and selected entry-point filenames were changed.
-- Historical folders, Python caches, run logs, generated panel images and superseded duplicate code trees were excluded.
-- Third-party pruning baselines are retained under `experiments/09_transformer_pruning/external/` with their original license files.
-- The manuscript Word files are not bundled in this code repository.
 
 Before a public release, review [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md), replace machine-specific data paths, add the final paper citation/DOI, and choose a license for the authors' code. No repository-wide license has been assigned in this draft.
 
