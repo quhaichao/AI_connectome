@@ -1,0 +1,5 @@
+* text=auto
+*.ipynb linguist-language=Jupyter Notebook
+*.csv text eol=lf
+*.sh text eol=lf
+
