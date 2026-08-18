@@ -36,5 +36,3 @@ Standard machine-learning datasets are downloaded or prepared as described in th
 Generated FC, SC and IS matrices are available at:
 
 https://drive.google.com/drive/folders/1H7QlQPQx330HigOpmPvDC03w2Jf4At4u
-
-Large datasets, trained checkpoints and generated outputs are not included in this repository.
