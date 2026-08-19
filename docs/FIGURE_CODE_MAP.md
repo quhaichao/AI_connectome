@@ -1,32 +1,32 @@
 # Figure-to-code map
 
-This index follows the current manuscript numbering (main Figs. 1–6 and Extended Data Figs. 1–8). “Shared” means that the code computes the underlying quantities but the final conceptual panel or composite layout was assembled separately. “Needs confirmation” marks correspondence that was not uniquely resolved in the source tree.
+This index follows the current manuscript numbering (main Figs. 1–6 and Extended Data Figs. 1–8).
 
 ## Main figures
 
-| Figure panels | Analysis | Primary entry point(s) | Status |
-| --- | --- | --- | --- |
-| Fig. 1a,e | Biological FC and anatomical SC definitions | `experiments/04_cross_system_fc_is_sc/biological_networks_fc_is_sc.ipynb` | Shared |
-| Fig. 1b,f | MLP FC and direct/Jacobian SC | `experiments/01_mlp_fc_is_dynamics/MLP_FC_IS_analysis.ipynb`; `supplementary/supp_fig1_mlp_jacobian.ipynb` | Shared |
-| Fig. 1c,g | CNN FC and kernel/Jacobian SC | `experiments/02_cnn_fc_is/cnn_fc_is_analysis.ipynb`; `supplementary/supp_fig1_cnn_transformer_jacobian.ipynb` | Shared |
-| Fig. 1d,h | Transformer FC and Jacobian SC | `experiments/03_transformer_fc_is/transformer_fc_is_sc_analysis.py`; `supplementary/supp_fig1_cnn_transformer_jacobian.ipynb` | Shared |
-| Fig. 2a | Input-similarity definition across systems | Core MLP/CNN/Transformer analyses plus `experiments/04_cross_system_fc_is_sc/figure2lib/analysis.py` | Shared |
-| Fig. 2b,e | Artificial-network FC–IS–SC comparisons | `experiments/04_cross_system_fc_is_sc/artificial_networks_fc_is_sc.ipynb` | Direct |
-| Fig. 2c,f | Biological-network FC–IS–SC comparisons | `experiments/04_cross_system_fc_is_sc/biological_networks_fc_is_sc.ipynb` | Direct |
-| Fig. 2d | Seven-system FC–IS versus FC–SC summary | Both cross-system notebooks plus `figure2lib/workflow.py` | Needs confirmation for final layout |
-| Fig. 3a–e | Formation and timing of the MLP FC–IS relationship | `experiments/01_mlp_fc_is_dynamics/MLP_FC_IS_analysis.ipynb` | Direct; panel a is conceptual |
-| Fig. 3f–g | FC/IS modularity and within/between-module allocation | `experiments/01_mlp_fc_is_dynamics/fig3_modularity_mechanism.ipynb` plus the core MLP notebook | Direct/shared |
-| Fig. 4a–j | Early- and late-changing FC pairs in classification | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb` | Direct |
-| Fig. 4k–m | Stable/fluctuating FC pairs in frequency learning | `experiments/05_mlp_functional_roles/fig4_frequency_learning.ipynb` | Direct |
-| Fig. 5a–f | FC, gradient flow, receptive fields and masking | `experiments/06_mlp_gradient_optimization/fig5_fc_gradient_mechanism.ipynb` | Direct |
-| Fig. 5g–i | Optimizer, BatchNorm and FC-guided residual comparisons | `experiments/06_mlp_gradient_optimization/fig5_fc_guided_optimization.ipynb`; `mlp_early_high_fc_utils.py` | Direct/shared |
-| Fig. 6a1–a4 | RoPE, residual, attention and normalization comparisons | Four `fig6a*.ipynb` notebooks under `experiments/07_transformer_architecture/`; `assemble_figure6a.py` | Direct |
-| Fig. 6b–c | FC-guided MoE construction and FC trajectories | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6b_c_fc_guided_moe.ipynb` | Direct/shared |
-| Fig. 6d | Six-method MoE perplexity benchmark | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6d_moe_benchmark.ipynb` | Direct |
-| Fig. 6e | Expert semantic specialization | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6e_s8bc_expert_specialization.ipynb` | Direct |
-| Fig. 6f | Stable high-FC redundancy | `experiments/09_transformer_pruning/scripts/collect_fc_matrices.py`; `analyze_fc_matrix_stability.py`; `plot_fc_layer_redundancy.py` | Needs confirmation for the exact final panel |
-| Fig. 6g | FC-guided structured-pruning workflow | `experiments/09_transformer_pruning/src/fc_pruning/` | Shared conceptual panel |
-| Fig. 6h | Structured-pruning perplexity comparison | `experiments/09_transformer_pruning/fig6h_s8d_pruning_results.ipynb`; `FC_pruning_raw_results.csv` | Direct |
+| Figure panels | Analysis | Primary entry point(s) |
+| --- | --- | --- |
+| Fig. 1a,e | Biological FC and anatomical SC definitions | `experiments/04_cross_system_fc_is_sc/biological_networks_fc_is_sc.ipynb` |
+| Fig. 1b,f | MLP FC and direct/Jacobian SC | `experiments/01_mlp_fc_is_dynamics/MLP_FC_IS_analysis.ipynb`; `supplementary/supp_fig1_mlp_jacobian.ipynb` |
+| Fig. 1c,g | CNN FC and kernel/Jacobian SC | `experiments/02_cnn_fc_is/cnn_fc_is_analysis.ipynb`; `supplementary/supp_fig1_cnn_transformer_jacobian.ipynb` |
+| Fig. 1d,h | Transformer FC and Jacobian SC | `experiments/03_transformer_fc_is/transformer_fc_is_sc_analysis.py`; `supplementary/supp_fig1_cnn_transformer_jacobian.ipynb` |
+| Fig. 2a | Input-similarity definition across systems | Core MLP/CNN/Transformer analyses plus `experiments/04_cross_system_fc_is_sc/figure2lib/analysis.py` |
+| Fig. 2b,e | Artificial-network FC–IS–SC comparisons | `experiments/04_cross_system_fc_is_sc/artificial_networks_fc_is_sc.ipynb` |
+| Fig. 2c,f | Biological-network FC–IS–SC comparisons | `experiments/04_cross_system_fc_is_sc/biological_networks_fc_is_sc.ipynb` |
+| Fig. 2d | Seven-system FC–IS versus FC–SC summary | Both cross-system notebooks plus `figure2lib/workflow.py` |
+| Fig. 3a–e | Formation and timing of the MLP FC–IS relationship | `experiments/01_mlp_fc_is_dynamics/MLP_FC_IS_analysis.ipynb` |
+| Fig. 3f–g | FC/IS modularity and within/between-module allocation | `experiments/01_mlp_fc_is_dynamics/fig3_modularity_mechanism.ipynb` plus the core MLP notebook |
+| Fig. 4a–j | Early- and late-changing FC pairs in classification | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb` |
+| Fig. 4k–m | Stable/fluctuating FC pairs in frequency learning | `experiments/05_mlp_functional_roles/fig4_frequency_learning.ipynb` |
+| Fig. 5a–f | FC, gradient flow, receptive fields and masking | `experiments/06_mlp_gradient_optimization/fig5_fc_gradient_mechanism.ipynb` |
+| Fig. 5g–i | Optimizer, BatchNorm and FC-guided residual comparisons | `experiments/06_mlp_gradient_optimization/fig5_fc_guided_optimization.ipynb`; `mlp_early_high_fc_utils.py` |
+| Fig. 6a1–a4 | RoPE, residual, attention and normalization comparisons | Four `fig6a*.ipynb` notebooks under `experiments/07_transformer_architecture/`; `assemble_figure6a.py` |
+| Fig. 6b–c | FC-guided MoE construction and FC trajectories | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6b_c_fc_guided_moe.ipynb` |
+| Fig. 6d | Six-method MoE perplexity benchmark | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6d_moe_benchmark.ipynb` |
+| Fig. 6e | Expert semantic specialization | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6e_s8bc_expert_specialization.ipynb` |
+| Fig. 6f | Stable high-FC redundancy | `experiments/09_transformer_pruning/scripts/collect_fc_matrices.py`; `analyze_fc_matrix_stability.py`; `plot_fc_layer_redundancy.py` |
+| Fig. 6g | FC-guided structured-pruning workflow | `experiments/09_transformer_pruning/src/fc_pruning/` |
+| Fig. 6h | Structured-pruning perplexity comparison | `experiments/09_transformer_pruning/fig6h_s8d_pruning_results.ipynb`; `FC_pruning_raw_results.csv` |
 
 ## Extended Data figures
 
