@@ -16,7 +16,8 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Fig. 2d | Seven-system FC–IS versus FC–SC summary | Both cross-system notebooks plus `figure2lib/workflow.py` |
 | Fig. 3a–e | Formation and timing of the MLP FC–IS relationship | `experiments/01_mlp_fc_is_dynamics/MLP_FC_IS_analysis.ipynb` |
 | Fig. 3f–g | FC/IS modularity and within/between-module allocation | `experiments/01_mlp_fc_is_dynamics/fig3_modularity_mechanism.ipynb` plus the core MLP notebook |
-| Fig. 4a–j | Early- and late-changing FC pairs in classification | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb` |
+| Fig. 4a–c,e–j | Early- and late-changing FC pairs in classification | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb` |
+| Fig. 4d | Independent 20-seed masking of early- versus late-FC-rise neurons | `experiments/05_mlp_functional_roles/fig4d_20seeds.py` |
 | Fig. 4k–m | Stable/fluctuating FC pairs in frequency learning | `experiments/05_mlp_functional_roles/fig4_frequency_learning.ipynb` |
 | Fig. 5a–f | FC, gradient flow, receptive fields and masking | `experiments/06_mlp_gradient_optimization/fig5_fc_gradient_mechanism.ipynb` |
 | Fig. 5g–i | Optimizer, BatchNorm and FC-guided residual comparisons | `experiments/06_mlp_gradient_optimization/fig5_fc_guided_optimization.ipynb`; `mlp_early_high_fc_utils.py` |
@@ -43,8 +44,8 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Extended Data Fig. 3d | Transformer pair-level timing | `experiments/03_transformer_fc_is/transformer_fc_is_sc_analysis.py` |
 | Extended Data Fig. 3e–g | Cross-seed FC-before-IS robustness | `supplementary/supp_fig3_fc_before_is.ipynb` |
 | Extended Data Fig. 4a–b | Direct FC perturbations | `experiments/01_mlp_fc_is_dynamics/supp_fig4_fc_perturbation.ipynb` |
-| Extended Data Fig. 5a–h | Multi-step and threshold sensitivity for Fig. 4 | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb` |
-| Extended Data Fig. 6a–d | Dataset generality of early/late FC roles | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb` |
+| Extended Data Fig. 5a–h | Multi-step and threshold sensitivity for Fig. 4 | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb`; `fig4d_20seeds.py --supplementary-suite` for seed-level masking robustness |
+| Extended Data Fig. 6a–d | Dataset generality of early/late FC roles | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb`; `fig4d_20seeds.py --supplementary-suite` for Fashion-MNIST and CIFAR-10 masking |
 | Extended Data Fig. 6e–g | Stable/fluctuating FC frequency analyses | `experiments/05_mlp_functional_roles/fig4_frequency_learning.ipynb` |
 | Extended Data Fig. 7a–n | FC–gradient and optimization robustness | `supplementary/supp_fig7_fc_mechanism_robustness.ipynb`; `supplementary/utils/fig5_mechanism.py`; `fig5_robustness.py` |
 | Extended Data Fig. 8a | Expert-cluster-reordered FC matrices | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6b_c_fc_guided_moe.ipynb` |
@@ -57,3 +58,21 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 2. Run the artificial/biological cross-system aggregation and modularity analysis.
 3. Run the dedicated Fig. 4, Fig. 5 and Fig. 6 experiment families.
 4. Run the supplementary robustness notebooks last, reusing model-level caches where applicable.
+
+## Fig. 4 independent-seed masking
+
+`experiments/05_mlp_functional_roles/fig4d_20seeds.py` is the primary entry point for the Fig. 4d accuracy-masking result. It trains 20 independently initialized MLPs and uses the training seed as the replication unit. Within each seed, it identifies 15 disjoint early-FC-rise and 15 disjoint late-FC-rise neurons, masks each complete group, and records masked accuracy minus the corresponding intact-checkpoint accuracy. The repeated random-subset analysis from one fixed neuron pool is not used for inference.
+
+Run the primary MNIST analysis from the repository root:
+
+```bash
+python experiments/05_mlp_functional_roles/fig4d_20seeds.py
+```
+
+Run the full masking robustness suite (MNIST at FC-rise thresholds 0.8 and 0.5, Fashion-MNIST at 0.8, and CIFAR-10 at 0.8):
+
+```bash
+python experiments/05_mlp_functional_roles/fig4d_20seeds.py --supplementary-suite
+```
+
+The default checkpoints are zero-based model-state indices `260,280,300,400,600,800,1100`; exported `Optimizer_Update` values equal `Step + 1`. Completed per-seed CSV files are reused automatically, while `--overwrite` reruns them. Outputs are written under `experiments/05_mlp_functional_roles/fig4d_20seeds_output/` and include seed-level source data, summary statistics with confidence intervals, paired early-versus-late tests, classification metadata, and PDF/SVG/PNG/TIFF figures.
