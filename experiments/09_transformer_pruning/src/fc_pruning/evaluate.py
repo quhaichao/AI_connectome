@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import math
+import time
 
 import torch
 import torch.nn.functional as F
 
 from .data import load_wikitext_test_tokens
+from .progress import report_progress
 
 
 @torch.inference_mode()
@@ -22,6 +24,8 @@ def evaluate_wikitext_ppl(model, tokenizer, test_path: str, config: dict, device
     total_nll = 0.0
     total_predictions = 0
     batch_size = int(config["evaluation_batch_size"])
+    started_at = time.monotonic()
+    progress_every = max(1, windows // 20)
     for begin in range(0, windows, batch_size):
         current = min(batch_size, windows - begin)
         batch = torch.stack(
@@ -32,13 +36,20 @@ def evaluate_wikitext_ppl(model, tokenizer, test_path: str, config: dict, device
         ).to(device)
         logits = model(input_ids=batch, use_cache=False).logits.float()
         shift_logits = logits[:, :-1].contiguous()
-        shift_labels = batch[:, 1:].contiguous()
+        shift_labels = batch[:, 1:].to(shift_logits.device).contiguous()
         total_nll += F.cross_entropy(
             shift_logits.view(-1, shift_logits.shape[-1]),
             shift_labels.view(-1),
             reduction="sum",
         ).item()
         total_predictions += shift_labels.numel()
+        report_progress(
+            "WikiText PPL",
+            begin + current,
+            windows,
+            started_at,
+            every=progress_every,
+        )
     return {
         "ppl": math.exp(total_nll / total_predictions),
         "nll": total_nll,

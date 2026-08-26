@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import time
+
 import torch
 import torch.nn.functional as F
 
 from .data import load_calibration
-from .modeling import llama_layers
+from .modeling import decoder_layers
+from .progress import report_progress
 from .pruning import apply_layer_plan
 
 
@@ -15,13 +18,21 @@ def pca_bases_from_covariances(
     device: torch.device,
 ) -> list[torch.Tensor]:
     bases = []
+    started_at = time.monotonic()
+    total = len(covariance_statistics["layers"])
     for index, statistics in enumerate(covariance_statistics["layers"]):
-        print(f"FANG PCA layer={index:02d}", flush=True)
         covariance = statistics["hidden_covariance"].float().to(device)
         _values, vectors = torch.linalg.eigh(covariance)
         bases.append(vectors[:, -components:].flip(1).cpu())
         del covariance, _values, vectors
         torch.cuda.empty_cache()
+        report_progress(
+            "FANG PCA",
+            index + 1,
+            total,
+            started_at,
+            detail=f"layer={index:02d}",
+        )
     return bases
 
 
@@ -34,7 +45,7 @@ def collect_projected_ffn_inputs(
 ) -> torch.Tensor:
     calibration = load_calibration(calibration_path)
     input_ids = calibration["input_ids"]
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     total = int(input_ids.numel())
     components = bases[0].shape[1]
     projected = torch.empty(
@@ -83,8 +94,8 @@ def kmeans_assignments(
     all_assignments = []
     all_centers = []
     generator = torch.Generator(device="cpu").manual_seed(seed)
+    started_at = time.monotonic()
     for layer_index in range(projected.shape[0]):
-        print(f"FANG K-means layer={layer_index:02d}", flush=True)
         data = projected[layer_index].float().to(device)
         initial = torch.randperm(data.shape[0], generator=generator)[:clusters]
         centers = data.index_select(0, initial.to(device)).clone()
@@ -99,6 +110,13 @@ def kmeans_assignments(
         all_centers.append(centers.cpu())
         del data, centers, distances, assignment, sums, counts
         torch.cuda.empty_cache()
+        report_progress(
+            "FANG K-means",
+            layer_index + 1,
+            projected.shape[0],
+            started_at,
+            detail=f"layer={layer_index:02d}",
+        )
     return torch.stack(all_assignments), all_centers
 
 
@@ -111,7 +129,7 @@ def collect_fang_cluster_statistics(
 ) -> dict:
     calibration = load_calibration(calibration_path)
     input_ids = calibration["input_ids"]
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     width = model.config.intermediate_size
     all_sums = []
     all_sums_sq = []
@@ -235,7 +253,7 @@ def build_and_apply_fang_flap_plans(
     targets: list[int] | None = None,
     apply: bool = True,
 ) -> list[dict]:
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     width = model.config.intermediate_size
     group_size = width // (clusters + 1)
     if targets is None:
@@ -243,9 +261,9 @@ def build_and_apply_fang_flap_plans(
     if len(targets) != len(layers):
         raise ValueError("FANG target count must match the number of layers")
     plans = []
+    started_at = time.monotonic()
     for layer_index, layer in enumerate(layers):
         target = int(targets[layer_index])
-        print(f"F-FANG plan layer={layer_index:02d}", flush=True)
         scores = statistics["taylor"][layer_index]
         per_cluster_top = torch.topk(scores, group_size, dim=1).indices
         frequency = torch.zeros(width, dtype=torch.long)
@@ -303,6 +321,13 @@ def build_and_apply_fang_flap_plans(
         if apply:
             apply_layer_plan(layer, plan)
         plans.append(plan)
+        report_progress(
+            "FANG plans",
+            layer_index + 1,
+            len(layers),
+            started_at,
+            detail=f"layer={layer_index:02d}",
+        )
     model.config.intermediate_size = layers[0].mlp.intermediate_size
     return plans
 
@@ -315,7 +340,7 @@ def collect_block_functional_complexity(
 ) -> torch.Tensor:
     """Collect FANG Eq. 8 block input/output cosine complexity."""
     input_ids = load_calibration(calibration_path)["input_ids"]
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     cosine_sums = torch.zeros(len(layers), dtype=torch.float64)
     counts = torch.zeros(len(layers), dtype=torch.long)
 

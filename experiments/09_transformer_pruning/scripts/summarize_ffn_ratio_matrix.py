@@ -9,36 +9,70 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
+from fc_pruning.modeling import MODEL_KEYS
+from fc_pruning.ratio_matrix import METHODS, RATIOS
+
 
 METHOD_LABELS = {
     "fc_ls": "FC + direct-source LS",
     "flap": "FLAP",
     "sobp": "SoBP",
-    "fand": "FAND",
+    "fang": "FANG",
     "slimllm": "SlimLLM",
     "wanda": "Wanda",
 }
+LEGACY_METHOD_ALIASES = {"fand": "fang"}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results-root", default="results/ffn_ratio_matrix")
+    parser.add_argument("--results-root", default="results/ffn_ratio_matrix_pearson")
+    parser.add_argument(
+        "--output-csv",
+        help="Raw CSV output path relative to the project root (default: RESULTS_ROOT/raw_results.csv)",
+    )
+    parser.add_argument(
+        "--aggregate-csv",
+        help="Aggregate CSV output path relative to the project root (default: RESULTS_ROOT/aggregate.csv)",
+    )
     parser.add_argument("--allow-incomplete", action="store_true")
     parser.add_argument("--seeds", nargs="+", type=int, default=list(range(10)))
+    parser.add_argument("--models", nargs="+", choices=MODEL_KEYS, default=list(MODEL_KEYS))
+    parser.add_argument("--domains", nargs="+", choices=("c4",), default=["c4"])
+    parser.add_argument("--ratios", nargs="+", type=float, default=list(RATIOS))
+    parser.add_argument(
+        "--methods", nargs="+", choices=METHODS, default=list(METHODS)
+    )
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1] / args.results_root
+    project_root = Path(__file__).resolve().parents[1]
+    root = project_root / args.results_root
     raw = []
     missing = []
-    for model in ("llama2_7b", "llama32_1b"):
-        for domain in ("c4", "wiki_train"):
+    for model in args.models:
+        for domain in args.domains:
             for seed in args.seeds:
                 path = root / model / domain / f"seed{seed}" / "summary.csv"
                 if not path.exists():
                     missing.append(str(path))
                     continue
                 with path.open(encoding="utf-8") as handle:
-                    raw.extend(dict(row) for row in csv.DictReader(handle))
-    expected = 2 * 2 * len(args.seeds) * 6 * 4
+                    for source_row in csv.DictReader(handle):
+                        row = dict(source_row)
+                        row["method"] = LEGACY_METHOD_ALIASES.get(
+                            row["method"], row["method"]
+                        )
+                        if (
+                            row["method"] in args.methods
+                            and float(row["ratio"]) in args.ratios
+                        ):
+                            raw.append(row)
+    expected = (
+        len(args.models)
+        * len(args.domains)
+        * len(args.seeds)
+        * len(args.methods)
+        * len(args.ratios)
+    )
     if (missing or len(raw) != expected) and not args.allow_incomplete:
         raise RuntimeError(f"Expected {expected} rows, found {len(raw)}; missing={missing}")
 
@@ -63,18 +97,30 @@ def main() -> None:
             }
         )
     root.mkdir(parents=True, exist_ok=True)
-    with (root / "raw_results.csv").open("w", newline="", encoding="utf-8") as handle:
+    output_csv = (
+        project_root / args.output_csv
+        if args.output_csv
+        else root / "raw_results.csv"
+    )
+    aggregate_csv = (
+        project_root / args.aggregate_csv
+        if args.aggregate_csv
+        else root / "aggregate.csv"
+    )
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    aggregate_csv.parent.mkdir(parents=True, exist_ok=True)
+    with output_csv.open("w", newline="", encoding="utf-8") as handle:
         if raw:
             writer = csv.DictWriter(handle, fieldnames=raw[0].keys())
             writer.writeheader()
             writer.writerows(raw)
-    with (root / "aggregate.csv").open("w", newline="", encoding="utf-8") as handle:
+    with aggregate_csv.open("w", newline="", encoding="utf-8") as handle:
         if aggregate:
             writer = csv.DictWriter(handle, fieldnames=aggregate[0].keys())
             writer.writeheader()
             writer.writerows(aggregate)
 
-    for domain in ("c4", "wiki_train"):
+    for domain in args.domains:
         lines = [
             f"# {domain} calibration: FFN ratio matrix",
             "",
@@ -82,18 +128,20 @@ def main() -> None:
             "WikiText-2 raw test is shared across all rows.",
             "",
         ]
-        for model in ("llama2_7b", "llama32_1b"):
+        for model in args.models:
             lines.extend(
                 [
                     f"## {model}",
                     "",
-                    "| Method | 20% PPL | 30% PPL | 40% PPL | 50% PPL |",
-                    "|---|---:|---:|---:|---:|",
+                    "| Method | "
+                    + " | ".join(f"{ratio:.0%} PPL" for ratio in args.ratios)
+                    + " |",
+                    "|---|" + "---:|" * len(args.ratios),
                 ]
             )
-            for method in METHOD_LABELS:
+            for method in args.methods:
                 cells = []
-                for ratio in (0.2, 0.3, 0.4, 0.5):
+                for ratio in args.ratios:
                     match = [
                         row for row in aggregate
                         if row["domain"] == domain
@@ -113,11 +161,20 @@ def main() -> None:
             "expected_rows": expected,
             "actual_rows": len(raw),
             "seeds": args.seeds,
+            "fc_similarity": "signed_pearson",
+            "raw_results": str(output_csv),
+            "aggregate_results": str(aggregate_csv),
             "missing": missing,
         }, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(json.dumps({"expected": expected, "actual": len(raw), "groups": len(aggregate)}, indent=2))
+    print(json.dumps({
+        "expected": expected,
+        "actual": len(raw),
+        "groups": len(aggregate),
+        "raw_results": str(output_csv),
+        "aggregate_results": str(aggregate_csv),
+    }, indent=2))
 
 
 if __name__ == "__main__":

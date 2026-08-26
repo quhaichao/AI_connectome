@@ -19,45 +19,47 @@ class GramPlanConfig:
     compensate_merge_mean: bool = True
 
 
+def _center_gram(
+    gram: torch.Tensor,
+    sums: torch.Tensor,
+    sample_count: int,
+) -> torch.Tensor:
+    """Convert X.T @ X into the centered cross-product used by Pearson r."""
+    if sample_count <= 0:
+        raise ValueError("sample_count must be positive")
+    sums = sums.to(device=gram.device, dtype=gram.dtype)
+    return gram - torch.outer(sums, sums) / sample_count
+
+
 def _topk_from_gram(
     gram: torch.Tensor,
     topk: int,
     block_size: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    diagonal = gram.diagonal().clamp_min(1e-30)
-    norms = diagonal.sqrt()
+    """Return the highest signed correlations from a centered Gram matrix."""
     width = gram.shape[0]
+    if gram.ndim != 2 or gram.shape[1] != width:
+        raise ValueError(f"Expected a square Gram matrix, got {tuple(gram.shape)}")
+    if not 0 < topk < width:
+        raise ValueError(f"topk must be in [1, {width - 1}], got {topk}")
+    if block_size <= 0:
+        raise ValueError("block_size must be positive")
+
+    diagonal = gram.diagonal().clamp_min(0.0)
+    variance_floor = diagonal.max().clamp_min(1.0) * 1e-12
+    valid = diagonal > variance_floor
+    inverse_norms = torch.zeros_like(diagonal)
+    inverse_norms[valid] = diagonal[valid].rsqrt()
     values = torch.empty((width, topk), dtype=torch.float32)
     indices = torch.empty((width, topk), dtype=torch.int32)
     for begin in range(0, width, block_size):
         end = min(width, begin + block_size)
-        similarity = gram[begin:end].abs()
-        similarity = similarity / norms[begin:end, None]
-        similarity = similarity / norms[None, :]
+        similarity = gram[begin:end] * inverse_norms[begin:end, None]
+        similarity = similarity * inverse_norms[None, :]
+        similarity = similarity.clamp(min=-1.0, max=1.0)
         rows = torch.arange(end - begin, device=gram.device)
         columns = torch.arange(begin, end, device=gram.device)
-        similarity[rows, columns] = -1.0
-        block_values, block_indices = torch.topk(similarity, topk, dim=1)
-        values[begin:end].copy_(block_values.float().cpu())
-        indices[begin:end].copy_(block_indices.int().cpu())
-    return values, indices
-
-
-def _topk_from_features(
-    features: torch.Tensor,
-    topk: int,
-    block_size: int,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    normalized = features / features.norm(dim=1, keepdim=True).clamp_min(1e-30)
-    width = normalized.shape[0]
-    values = torch.empty((width, topk), dtype=torch.float32)
-    indices = torch.empty((width, topk), dtype=torch.int32)
-    for begin in range(0, width, block_size):
-        end = min(width, begin + block_size)
-        similarity = (normalized[begin:end] @ normalized.t()).abs()
-        rows = torch.arange(end - begin, device=features.device)
-        columns = torch.arange(begin, end, device=features.device)
-        similarity[rows, columns] = -1.0
+        similarity[rows, columns] = -torch.inf
         block_values, block_indices = torch.topk(similarity, topk, dim=1)
         values[begin:end].copy_(block_values.float().cpu())
         indices[begin:end].copy_(block_indices.int().cpu())
@@ -86,21 +88,14 @@ def build_layer_candidate_pool(
     total_variance = (total_second - total_mean.square()).clamp_min(0.0)
     importance = total_variance * output_norm_sq
 
-    if method == "fc":
-        similarities, neighbors = _topk_from_gram(fit_gram, topk, block_size)
-    elif method in {"is_raw", "is_branch"}:
-        gate = layer.mlp.gate_proj.weight.detach().float().to(device)
-        up = layer.mlp.up_proj.weight.detach().float().to(device)
-        if method == "is_raw":
-            features = torch.cat([gate, up], dim=1)
-        else:
-            gate = gate / gate.norm(dim=1, keepdim=True).clamp_min(1e-30)
-            up = up / up.norm(dim=1, keepdim=True).clamp_min(1e-30)
-            features = torch.cat([gate, up], dim=1) / 2.0**0.5
-        similarities, neighbors = _topk_from_features(features, topk, block_size)
-        del gate, up, features
-    else:
-        raise ValueError(f"Unsupported Gram similarity method: {method}")
+    if method != "fc":
+        raise ValueError(f"Unsupported similarity method: {method}")
+    centered_fit_gram = _center_gram(fit_gram, fit_sum, fit_count)
+    similarities, neighbors = _topk_from_gram(
+        centered_fit_gram, topk, block_size
+    )
+    similarity_metric = "signed_pearson"
+    del centered_fit_gram
 
     query = torch.arange(fit_gram.shape[0], device=device).unsqueeze(1)
     query = query.expand(-1, topk)
@@ -133,6 +128,7 @@ def build_layer_candidate_pool(
         "importance": importance.float().cpu(),
         "output_norm_sq": output_norm_sq.float().cpu(),
         "method": method,
+        "similarity_metric": similarity_metric,
     }
     return payload
 
@@ -296,6 +292,7 @@ def plan_from_candidate_pool(
             bias += down[:, source] * residual_mean
     plan = {
         "method": pool["method"],
+        "similarity_metric": pool.get("similarity_metric", "legacy_unspecified"),
         "target": target,
         "direct": direct,
         "merges": merges,

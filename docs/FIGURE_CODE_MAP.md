@@ -25,9 +25,9 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Fig. 6b–c | FC-guided MoE construction and FC trajectories | `experiments/08_transformer_moe/fig6b_c_fc_guided_moe.ipynb` |
 | Fig. 6d | Six-method MoE perplexity benchmark | `experiments/08_transformer_moe/fig6d_moe_benchmark.ipynb` |
 | Fig. 6e | Expert semantic specialization | `experiments/08_transformer_moe/fig6e_s8bc_expert_specialization.ipynb` |
-| Fig. 6f | Stable high-FC redundancy | `experiments/09_transformer_pruning/scripts/collect_fc_matrices.py`; `analyze_fc_matrix_stability.py`; `plot_fc_layer_redundancy.py` |
+| Fig. 6f | Stable high-FC redundancy | No standalone generation script is included in the current repository release |
 | Fig. 6g | FC-guided structured-pruning workflow | `experiments/09_transformer_pruning/src/fc_pruning/` |
-| Fig. 6h | Structured-pruning perplexity comparison | `experiments/09_transformer_pruning/fig6h_s8d_pruning_results.ipynb`; `FC_pruning_raw_results.csv` |
+| Fig. 6h | Structured-pruning perplexity comparison | `experiments/09_transformer_pruning/notebooks/fig6h_s8d_pruning_results.ipynb`; `scripts/plot_ffn_ratio_results.py`; generated `results/ffn_ratio_matrix_pearson/raw_results.csv` |
 
 ## Extended Data figures
 
@@ -50,7 +50,7 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Extended Data Fig. 7a–n | FC–gradient and optimization robustness | `supplementary/supp_fig7_fc_mechanism_robustness.ipynb`; `supplementary/utils/fig5_mechanism.py`; `fig5_robustness.py` |
 | Extended Data Fig. 8a | Expert-cluster-reordered FC matrices | `experiments/08_transformer_moe/fig6b_c_fc_guided_moe.ipynb` |
 | Extended Data Fig. 8b–c | Layer-wise and seed-level expert specialization | `experiments/08_transformer_moe/fig6e_s8bc_expert_specialization.ipynb` |
-| Extended Data Fig. 8d | Multi-ratio, multi-seed pruning results | `experiments/09_transformer_pruning/fig6h_s8d_pruning_results.ipynb`; `FC_pruning_raw_results.csv` |
+| Extended Data Fig. 8d | Multi-ratio, multi-seed pruning results | `experiments/09_transformer_pruning/notebooks/fig6h_s8d_pruning_results.ipynb`; `scripts/plot_ffn_ratio_results.py`; generated `results/ffn_ratio_matrix_pearson/raw_results.csv` |
 
 ## Suggested execution order
 

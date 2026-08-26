@@ -1,77 +1,135 @@
-# Structured FFN pruning for Llama
+# FC-pruning reproduction
 
-This repository contains two retained experiment tracks for structured FFN
-pruning: the final controlled six-method ratio matrix, and the earlier broad
-Llama-2-7B 20% benchmark against OCP, SVD-LLM, SliceGPT, and PruneNet.
-Attention-head pruning and rejected search branches are outside the final
-scope.
+This directory contains the code used to reproduce the C4 structured FFN
+pruning experiments and figures for:
 
-## Final protocol
+- Llama-3.2-1B
+- Qwen2.5-1.5B
 
-- Models: Llama-2-7B and Llama-3.2-1B.
-- Methods: FC-LS, FLAP, SoBP, FAND, SlimLLM, and Wanda.
-- FFN pruning ratios: 20%, 30%, 40%, and 50% in every layer.
-- Calibration domains: C4 and WikiText-2 train.
-- Calibration subsets: seeds 0 through 9, independently sampled per model and
-  domain.
-- Calibration budget: 128 sequences x 2048 tokens = 262,144 tokens.
-- Evaluation: WikiText-2 raw test, 165 complete 2048-token windows and 337,755
-  predicted positions.
+The same pipeline evaluates FC-pruning, FLAP, SoBP, FANG, SlimLLM, and Wanda at
+20%, 30%, 40%, and 50% pruning. Each result is averaged over ten independently
+sampled C4 calibration subsets. WikiText-2 raw test perplexity is the evaluation
+metric.
 
-The complete matrix contains 960 unique evaluations:
+The internal result key for our method is `fc_ls`; figures display it as
+**FC-pruning**. FC-pruning uses signed Pearson correlation for functional
+connectivity.
 
-```text
-2 models x 2 domains x 10 seeds x 6 methods x 4 ratios = 960
-```
+Models, datasets, calibration tensors, pruning plans, caches, result tables,
+and generated figures are intentionally excluded from this repository.
 
-## Repository layout
+## 1. Environment
 
-```text
-src/fc_pruning/              Core pruning, reconstruction, and evaluation code
-scripts/                     Calibration, execution, summary, and plotting tools
-tests/                       Focused CPU unit tests
-results/ffn_ratio_matrix/    Raw and aggregate final results
-results/fc_layer_analysis/   Layer-wise FC statistics and figures
-results/prior_20pct_benchmarks/  Earlier broad baseline and cost tables
-external/                    Official-source snapshots used by reproductions
-```
-
-Models and datasets are intentionally not committed. Expected local paths are:
-
-```text
-models/Llama-2-7b-hf/
-models/Llama-3.2-1B/
-data/c4/raw/c4-train.00000-of-01024.json.gz
-data/wikitext2_raw/{train,validation,test}-00000-of-00001.parquet
-```
-
-## Reproduction
-
-Use an environment with a working NVIDIA driver and install the Python
-dependencies in `requirements.txt`. The original experiments used the local
-`transformer` environment.
+Python 3.12 was used for the reported experiments. Install a CUDA-compatible
+PyTorch build for your machine first, then install the remaining dependencies:
 
 ```bash
+python -m pip install -r requirements.txt
 export PYTHONPATH=src:.
-PYTHON=/path/to/transformer/bin/python
-
-$PYTHON scripts/build_ffn_ratio_matrix_calibrations.py
-$PYTHON -u scripts/run_ffn_ratio_matrix.py --gpus 0 1
-$PYTHON scripts/summarize_ffn_ratio_matrix.py
+PYTHON=python
 ```
 
-The runner supports `--resume`: completed method/ratio rows in each condition
-are skipped. Per-condition plans and sufficient-statistic caches are generated
-locally and are excluded from Git because they are reproducible and large.
+All commands below are run from this directory.
 
-The earlier 20% baselines use
-`configs/llama2_7b_20pct_full_wiki_train_reproduction.json`. Their individual
-entry points are retained under `scripts/run_*_reproduction.py`,
-`scripts/run_slicegpt_equal_macs.py`, and `scripts/run_svd_llm_*_equal_macs.py`.
-The official FLAP, Wanda, SVD-LLM, SliceGPT, and PruneNet source snapshots are
-kept under `external/` for provenance.
+## 2. Local models and datasets
 
-`residual_channel_analysis/` is a separate local project and is intentionally
-excluded from this repository.
+Download the model checkpoints from Hugging Face and place them at exactly:
 
-See `RESULTS.md` for conclusions and `results/README.md` for artifact details.
+```text
+models/Llama-3.2-1B/
+models/Qwen2.5-1.5B/
+```
+
+The directories must include `config.json`, tokenizer files, and all model
+weight files. Model loading is offline (`local_files_only=True`).
+
+Place the required dataset files at:
+
+```text
+data/c4/raw/c4-train.00000-of-01024.json.gz
+data/wikitext2_raw/test-00000-of-00001.parquet
+```
+
+The experiment uses the English C4 training shard
+`c4-train.00000-of-01024.json.gz` and the
+`Salesforce/wikitext` `wikitext-2-raw-v1` test parquet.
+
+## 3. Build calibration subsets
+
+Calibration data is tokenized independently for each model so Qwen never reuses
+Llama token IDs:
+
+```bash
+$PYTHON scripts/build_ffn_ratio_matrix_calibrations.py \
+  --models llama32_1b qwen25_1_5b
+```
+
+This creates ten `128 x 2048` C4 calibration tensors per model and writes
+`data/ffn_ratio_matrix/manifest.json`.
+
+## 4. Run the experiments
+
+For one GPU:
+
+```bash
+$PYTHON -u scripts/run_ffn_ratio_matrix.py \
+  --models llama32_1b qwen25_1_5b \
+  --gpus 0
+```
+
+To run only one model, pass either `--models llama32_1b` or
+`--models qwen25_1_5b`. The scheduler resumes completed conditions
+automatically. Progress, elapsed time, and ETA are printed to the terminal and
+also saved under `results/ffn_ratio_matrix_pearson/logs/`.
+
+Statistics caches are stored under `/tmp/ffn_ratio_matrix_pearson` while a
+condition is running. Allow roughly 20 GB of temporary disk space per active
+condition.
+
+## 5. Summarize and plot
+
+Combine all seed-level result files:
+
+```bash
+$PYTHON scripts/summarize_ffn_ratio_matrix.py \
+  --models llama32_1b qwen25_1_5b
+```
+
+This writes:
+
+```text
+results/ffn_ratio_matrix_pearson/raw_results.csv
+results/ffn_ratio_matrix_pearson/aggregate.csv
+results/ffn_ratio_matrix_pearson/summary_c4.md
+```
+
+Generate one pruning curve per model and separate 20%, 30%, 40%, and 50% seed
+point plots:
+
+```bash
+$PYTHON scripts/plot_ffn_ratio_results.py \
+  --models llama32_1b qwen25_1_5b
+```
+
+Figures are written as both PNG and PDF under
+`pruning_figures/by_model/`. Methods in every point plot are ordered by mean PPL
+from high to low. Shaded curve bands and black point-plot error bars represent
+the sample standard deviation over seeds. Use `--error-type sem` to show
+standard error bands in the curves instead.
+
+The lightweight notebook
+`notebooks/fig6h_s8d_pruning_results.ipynb` runs the same plotting command and
+previews the generated PNG files.
+
+Because the two models use different tokenizers, compare pruning methods within
+each model; absolute PPL values should not be compared directly between models.
+
+## 6. Tests
+
+```bash
+$PYTHON -m unittest discover -s tests -v
+```
+
+The tests cover the shared Llama/Qwen model adapter, signed Pearson candidate
+selection, pruning plans, reconstruction, progress reporting, and the SlimLLM
+reproduction.

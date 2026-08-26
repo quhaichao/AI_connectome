@@ -1,10 +1,15 @@
 import unittest
+from types import SimpleNamespace
 
 import torch
 from torch import nn
 
+from fc_pruning.fang_reproduction import build_and_apply_fang_flap_plans
 from fc_pruning.gram_similarity import (
     GramPlanConfig,
+    _center_gram,
+    _topk_from_gram,
+    build_layer_candidate_pool,
     plan_from_candidate_pool,
 )
 
@@ -14,15 +19,9 @@ from fc_pruning.data import (
     _wikitext_heading_level,
 )
 from fc_pruning.pruning import (
-    _fit_no_intercept,
     apply_layer_plan,
-    output_importance,
-    plan_importance_method,
-    plan_similarity_pruning,
 )
-
-from scripts.analyze_fc_matrix_stability import matrix_metrics
-
+from fc_pruning.sobp_reproduction import apply_sobp_layer
 
 class ToyMLP(nn.Module):
     def __init__(self):
@@ -40,6 +39,65 @@ class ToyLayer(nn.Module):
 
 
 class PruningTests(unittest.TestCase):
+    def test_fc_neighbors_use_signed_pearson_correlation(self):
+        base = torch.tensor([-2.0, -1.0, 1.0, 2.0])
+        activations = torch.stack(
+            [
+                base,
+                3.0 * base + 10.0,
+                -2.0 * base + 10.0,
+            ],
+            dim=1,
+        )
+        centered_gram = _center_gram(
+            activations.t() @ activations,
+            activations.sum(dim=0),
+            activations.shape[0],
+        )
+        similarities, neighbors = _topk_from_gram(
+            centered_gram, topk=2, block_size=2
+        )
+
+        self.assertEqual(int(neighbors[0, 0]), 1)
+        self.assertAlmostEqual(float(similarities[0, 0]), 1.0, places=6)
+        self.assertEqual(int(neighbors[0, 1]), 2)
+        self.assertAlmostEqual(float(similarities[0, 1]), -1.0, places=6)
+
+    def test_candidate_pool_records_signed_pearson_protocol(self):
+        base = torch.tensor([-2.0, -1.0, 1.0, 2.0])
+        fit = torch.stack(
+            [
+                base,
+                3.0 * base + 10.0,
+                -2.0 * base + 10.0,
+                torch.tensor([0.0, 1.0, 0.0, 1.0]),
+            ],
+            dim=1,
+        )
+        holdout = fit + 0.1
+        total = torch.cat([fit, holdout], dim=0)
+        pool = build_layer_candidate_pool(
+            ToyLayer(),
+            fit.t() @ fit,
+            holdout.t() @ holdout,
+            fit.sum(dim=0),
+            holdout.sum(dim=0),
+            total.sum(dim=0),
+            fit.shape[0],
+            holdout.shape[0],
+            total.shape[0],
+            topk=1,
+            block_size=2,
+            method="fc",
+        )
+
+        self.assertEqual(pool["similarity_metric"], "signed_pearson")
+        self.assertEqual(
+            {int(pool["source"][0, 0]), int(pool["keeper"][0, 0])},
+            {0, 1},
+        )
+        self.assertAlmostEqual(float(pool["similarity"][0, 0]), 1.0, places=6)
+
     def test_gram_plan_prefers_exact_merge_and_protects_keeper(self):
         layer = nn.Module()
         layer.mlp = nn.Module()
@@ -89,20 +147,6 @@ class PruningTests(unittest.TestCase):
         )
         self.assertEqual(articles, [("= One =", ["first", "second"]), ("= Two =", ["third"])])
 
-    def test_no_intercept_fit_recovers_scaled_activation(self):
-        receiver = torch.linspace(-2, 2, 100)
-        activations = torch.stack([2.5 * receiver, receiver], dim=1)
-        alpha, residual, _ = _fit_no_intercept(activations, 0, 1, ridge=0.0)
-        self.assertLess(abs(alpha - 2.5), 1e-6)
-        self.assertLess(residual, 1e-12)
-
-    def test_output_importance_has_expected_shape(self):
-        activations = torch.randn(20, 4)
-        down = torch.randn(3, 4)
-        importance = output_importance(activations, down)
-        self.assertEqual(importance.shape, (4,))
-        self.assertTrue(torch.all(importance >= 0))
-
     def test_simultaneous_merge_preserves_exact_redundancy(self):
         layer = ToyLayer()
         original = layer.mlp.down_proj.weight.detach().clone()
@@ -118,95 +162,39 @@ class PruningTests(unittest.TestCase):
             torch.allclose(layer.mlp.down_proj.weight[:, 0], original[:, 1] + 2 * original[:, 0])
         )
 
-    def test_method_specific_merge_cap_overrides_global_cap(self):
-        activations = torch.randn(24, 4)
-        config = {
-            "similarity_fit_fraction": 0.75,
-            "ridge_relative": 0.0001,
-            "activation_energy_relative_floor": 0.0,
-            "protect_top_importance_fraction": 0.0,
-            "dead_importance_median_ratio": 0.0,
-            "topk_receivers": 2,
-            "similarity_block_size": 4,
-            "minimum_source_similarity": -1.0,
-            "minimum_validation_reconstruction_gain": -1.0,
-            "selection_rule": "joint_cost",
-            "max_merges_per_keeper": 8,
-            "max_merge_fraction": 1.0,
-            "max_merge_fraction_by_method": {"fc": 0.0},
-            "sampled_positions_per_sequence": 6,
-        }
+    def test_sobp_updates_layer_intermediate_size(self):
         layer = ToyLayer()
-        plan = plan_similarity_pruning(
-            "fc",
+        audit = apply_sobp_layer(
             layer,
-            activations,
-            ratio=0.5,
-            config=config,
+            torch.eye(4),
+            target=1,
             device=torch.device("cpu"),
         )
-        self.assertEqual(plan["merges"], [])
+        self.assertEqual(audit["kept"], 3)
+        self.assertEqual(layer.mlp.intermediate_size, 3)
+        self.assertEqual(layer.mlp.gate_proj.out_features, 3)
+        self.assertEqual(layer.mlp.down_proj.in_features, 3)
 
-    def test_flap_hybrid_with_zero_merge_cap_matches_flap(self):
-        torch.manual_seed(7)
-        activations = torch.randn(24, 4) + torch.tensor([0.0, 0.5, -1.0, 2.0])
-        config = {
-            "similarity_fit_fraction": 0.75,
-            "similarity_direct_method": "flap",
-            "direct_bias_compensation": True,
-            "ridge_relative": 0.0001,
-            "activation_energy_relative_floor": 0.0,
-            "protect_top_importance_fraction": 0.0,
-            "dead_importance_median_ratio": 0.0,
-            "topk_receivers": 2,
-            "similarity_block_size": 4,
-            "minimum_source_similarity": -1.0,
-            "minimum_validation_reconstruction_gain": -1.0,
-            "selection_rule": "joint_cost",
-            "max_merges_per_keeper": 8,
-            "max_merge_fraction": 1.0,
-            "max_merge_fraction_by_method": {"fc_flap": 0.0},
-            "sampled_positions_per_sequence": 6,
+    def test_fang_plan_uses_canonical_name_and_shared_adapter(self):
+        model = SimpleNamespace(
+            config=SimpleNamespace(intermediate_size=4),
+            model=SimpleNamespace(layers=[ToyLayer()]),
+        )
+        statistics = {
+            "taylor": torch.tensor([[[4.0, 3.0, 2.0, 1.0]]]),
+            "mean": torch.zeros(1, 1, 4),
+            "variance": torch.ones(1, 1, 4),
         }
-        layer = ToyLayer()
-        flap = plan_importance_method("flap", layer, activations, ratio=0.5)
-        hybrid = plan_similarity_pruning(
-            "fc_flap",
-            layer,
-            activations,
-            ratio=0.5,
-            config=config,
-            device=torch.device("cpu"),
+        plans = build_and_apply_fang_flap_plans(
+            model,
+            statistics,
+            ratio=0.25,
+            clusters=1,
+            apply=False,
         )
-        self.assertEqual(hybrid["merges"], [])
-        self.assertEqual(hybrid["pruned"], flap["pruned"])
-        self.assertTrue(
-            torch.allclose(hybrid["bias_compensation"], flap["bias_compensation"])
-        )
-
-        config["max_merge_fraction_by_method"]["fc_flap"] = 1.0
-        config["minimum_source_similarity"] = 1.0
-        thresholded = plan_similarity_pruning(
-            "fc_flap",
-            layer,
-            activations,
-            ratio=0.5,
-            config=config,
-            device=torch.device("cpu"),
-        )
-        self.assertEqual(thresholded["merges"], [])
-        self.assertEqual(thresholded["pruned"], flap["pruned"])
-
-    def test_fc_matrix_metrics_identical_and_permuted_neighbors(self):
-        matrix = torch.tensor(
-            [[1.0, 0.9, 0.2], [0.9, 1.0, 0.4], [0.2, 0.4, 1.0]]
-        )
-        metrics = matrix_metrics(matrix, matrix, topk=1)
-        self.assertAlmostEqual(metrics["pearson"], 1.0, places=6)
-        self.assertAlmostEqual(metrics["cosine"], 1.0, places=6)
-        self.assertAlmostEqual(metrics["mae"], 0.0, places=6)
-        self.assertAlmostEqual(metrics["top32_overlap"], 1.0, places=6)
-
+        self.assertEqual(plans[0]["method"], "fang_flap_paper_reproduction")
+        self.assertEqual(plans[0]["target"], 1)
+        self.assertEqual(len(plans[0]["pruned"]), 1)
 
 if __name__ == "__main__":
     unittest.main()

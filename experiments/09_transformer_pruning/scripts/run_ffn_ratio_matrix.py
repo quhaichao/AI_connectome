@@ -7,20 +7,36 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from collections import deque
 from pathlib import Path
+
+from fc_pruning.modeling import MODEL_KEYS
+from fc_pruning.ratio_matrix import METHODS, RATIOS
+
+
+def _tee_child_output(stream, handle, label: str) -> None:
+    """Mirror one condition's unbuffered output to its log and the terminal."""
+    try:
+        for line in stream:
+            handle.write(line)
+            handle.flush()
+            print(f"[{label}] {line}", end="", flush=True)
+    finally:
+        stream.close()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", default="data/ffn_ratio_matrix/manifest.json")
-    parser.add_argument("--gpus", nargs="+", default=["0", "1"])
-    parser.add_argument("--results-root", default="results/ffn_ratio_matrix")
-    parser.add_argument("--cache-dir", default="/tmp/ffn_ratio_matrix")
-    parser.add_argument("--models", nargs="+", default=["llama2_7b", "llama32_1b"])
-    parser.add_argument("--domains", nargs="+", default=["c4", "wiki_train"])
+    parser.add_argument("--gpus", nargs="+", default=["0"])
+    parser.add_argument("--results-root", default="results/ffn_ratio_matrix_pearson")
+    parser.add_argument("--cache-dir", default="/tmp/ffn_ratio_matrix_pearson")
+    parser.add_argument("--models", nargs="+", choices=MODEL_KEYS, default=list(MODEL_KEYS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(range(10)))
+    parser.add_argument("--methods", nargs="+", choices=METHODS, default=list(METHODS))
+    parser.add_argument("--ratios", nargs="+", type=float, default=list(RATIOS))
     parser.add_argument("--poll-seconds", type=int, default=10)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -29,7 +45,7 @@ def main() -> None:
         item
         for item in manifest["conditions"]
         if item["model"] in args.models
-        and item["domain"] in args.domains
+        and item["domain"] == "c4"
         and int(item["seed"]) in args.seeds
     ]
     # Alternate model sizes so both GPUs do not always enter the largest
@@ -66,6 +82,10 @@ def main() -> None:
                 args.cache_dir,
                 "--device",
                 "cuda:0",
+                "--methods",
+                *args.methods,
+                "--ratios",
+                *(str(value) for value in args.ratios),
                 "--resume",
             ]
             environment = os.environ.copy()
@@ -76,17 +96,36 @@ def main() -> None:
                 command,
                 cwd=root,
                 env=environment,
-                stdout=handle,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
             )
-            running[gpu] = (process, handle, item, log_path)
-            print(f"GPU {gpu}: started {label} pid={process.pid}", flush=True)
+            output_thread = threading.Thread(
+                target=_tee_child_output,
+                args=(process.stdout, handle, label),
+                daemon=True,
+            )
+            output_thread.start()
+            running[gpu] = (
+                process,
+                handle,
+                output_thread,
+                item,
+                log_path,
+            )
+            print(
+                f"GPU {gpu}: started {label} pid={process.pid}; "
+                f"queued={len(queue)}",
+                flush=True,
+            )
         time.sleep(args.poll_seconds)
         for gpu, state in list(running.items()):
-            process, handle, item, log_path = state
+            process, handle, output_thread, item, log_path = state
             return_code = process.poll()
             if return_code is None:
                 continue
+            output_thread.join()
             handle.close()
             label = f"{item['model']}_{item['domain']}_seed{item['seed']}"
             if return_code:

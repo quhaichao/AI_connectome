@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import torch
@@ -11,10 +12,11 @@ from .fang_reproduction import (
     kmeans_assignments,
     pca_bases_from_covariances,
 )
-from .modeling import llama_layers
+from .modeling import decoder_layers
+from .progress import report_progress
 
 
-METHODS = ("fc_ls", "flap", "sobp", "fand", "slimllm", "wanda")
+METHODS = ("fc_ls", "flap", "sobp", "fang", "slimllm", "wanda")
 RATIOS = (0.2, 0.3, 0.4, 0.5)
 
 
@@ -42,7 +44,7 @@ def collect_ratio_statistics(model, calibration_path: str, device: torch.device)
     input_ids = calibration["input_ids"]
     if tuple(input_ids.shape) != (128, 2048):
         raise ValueError(f"Expected (128, 2048) calibration, got {tuple(input_ids.shape)}")
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     width = int(model.config.intermediate_size)
     hidden = int(model.config.hidden_size)
     fit_contexts = 96
@@ -93,11 +95,17 @@ def collect_ratio_statistics(model, calibration_path: str, device: torch.device)
             ]
         )
     try:
+        started_at = time.monotonic()
         for context, sequence in enumerate(input_ids):
             state["context"] = context
             model(input_ids=sequence.unsqueeze(0).to(device), use_cache=False)
-            if (context + 1) % 8 == 0:
-                print(f"Ratio statistics context={context + 1}/128", flush=True)
+            report_progress(
+                "Dense statistics",
+                context + 1,
+                input_ids.shape[0],
+                started_at,
+                every=8,
+            )
     finally:
         for handle in handles:
             handle.remove()
@@ -138,7 +146,7 @@ def load_ratio_statistics(path: str | Path) -> dict:
     return torch.load(path, map_location="cpu", weights_only=True)
 
 
-def collect_fand_statistics_fast(
+def collect_fang_statistics_fast(
     model,
     calibration_path: str,
     ratio_statistics: dict,
@@ -148,10 +156,10 @@ def collect_fand_statistics_fast(
     kmeans_iterations: int = 20,
     seed: int = 0,
 ) -> dict:
-    """Collect FAND/FANG cluster Taylor statistics in one backward per context."""
+    """Collect FANG cluster Taylor statistics in one backward per context."""
     calibration = load_calibration(calibration_path)
     input_ids = calibration["input_ids"]
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     bases = pca_bases_from_covariances(
         {"layers": [{"hidden_covariance": x["hidden_covariance"]} for x in ratio_statistics["layers"]]},
         pca_components,
@@ -177,10 +185,18 @@ def collect_fand_statistics_fast(
         for index, layer in enumerate(layers)
     ]
     try:
+        started_at = time.monotonic()
         with torch.inference_mode():
             for context, sequence in enumerate(input_ids):
                 context_state["index"] = context
                 model(input_ids=sequence.unsqueeze(0).to(device), use_cache=False)
+                report_progress(
+                    "FANG projection",
+                    context + 1,
+                    input_ids.shape[0],
+                    started_at,
+                    every=8,
+                )
     finally:
         for handle in handles:
             handle.remove()
@@ -220,6 +236,7 @@ def collect_fand_statistics_fast(
         for index, layer in enumerate(layers)
     ]
     try:
+        started_at = time.monotonic()
         for context, sequence in enumerate(input_ids):
             context_state["index"] = context
             tokens = sequence.unsqueeze(0).to(device)
@@ -232,8 +249,13 @@ def collect_fand_statistics_fast(
             model.zero_grad(set_to_none=True)
             del tokens, logits, loss
             torch.cuda.empty_cache()
-            if (context + 1) % 8 == 0:
-                print(f"FAND Taylor context={context + 1}/128", flush=True)
+            report_progress(
+                "FANG Taylor",
+                context + 1,
+                input_ids.shape[0],
+                started_at,
+                every=8,
+            )
     finally:
         for handle in handles:
             handle.remove()

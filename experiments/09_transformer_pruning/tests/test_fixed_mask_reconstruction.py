@@ -2,7 +2,9 @@ import unittest
 
 import torch
 
-from fc_pruning.fixed_mask_reconstruction import apply_fixed_mask_reconstruction
+from fc_pruning.fixed_mask_reconstruction import (
+    apply_fixed_mask_reconstruction,
+)
 from tests.test_pruning import ToyLayer
 
 
@@ -111,7 +113,6 @@ class FixedMaskReconstructionTests(unittest.TestCase):
         )
         self.assertEqual(audit["merge_residual_weight"], 0.5)
         self.assertFalse(torch.allclose(layer.mlp.down_proj.weight[:, 0], original[:, 1]))
-
 
 if __name__ == "__main__":
     unittest.main()

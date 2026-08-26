@@ -1,8 +1,10 @@
 # Install a CUDA-compatible PyTorch build for the target host first.
 torch>=2.6
 transformers==4.57.1
+accelerate>=1.0
 pyarrow==22.0.0
 numpy>=2.0
 scipy>=1.15
+pandas>=2.2
 matplotlib>=3.10
-pytest>=8.0
+jupyterlab>=4.0

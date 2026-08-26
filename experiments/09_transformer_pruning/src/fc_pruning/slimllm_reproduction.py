@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import time
+
 import torch
 from torch import nn
 
-from .modeling import llama_layers
+from .modeling import decoder_layers
+from .progress import report_progress
 
 
 SLIMLLM_SELECTION_MODES = ("official_piecewise", "direct_lowest")
@@ -205,7 +208,7 @@ def apply_slimllm_plan(layer, plan: dict, use_regression: bool) -> None:
 
 @torch.no_grad()
 def apply_slimllm_plans(model, plans: list[dict], use_regression: bool) -> None:
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     if len(layers) != len(plans):
         raise ValueError("SlimLLM plans and model have different layer counts")
     for layer, plan in zip(layers, plans):
@@ -226,7 +229,7 @@ def build_slimllm_plans(
     device: torch.device,
     modes: tuple[str, ...] = SLIMLLM_SELECTION_MODES,
 ) -> dict[str, list[dict]]:
-    layers = llama_layers(model)
+    layers = decoder_layers(model)
     expected = 128 * 2048
     protocols = (
         full_statistics["protocol"],
@@ -246,8 +249,8 @@ def build_slimllm_plans(
     if invalid_modes:
         raise ValueError(f"Unsupported SlimLLM selection modes: {sorted(invalid_modes)}")
     plans = {mode: [] for mode in modes}
+    started_at = time.monotonic()
     for layer_index, layer in enumerate(layers):
-        print(f"SlimLLM score layer={layer_index:02d}", flush=True)
         full = full_statistics["layers"][layer_index]
         covariance = covariance_statistics["layers"][layer_index]
         count = int(full["count"])
@@ -264,9 +267,6 @@ def build_slimllm_plans(
         )
         for mode in modes:
             pruned, _keep = select_slimllm_channels(scores, target, mode)
-            print(
-                f"SlimLLM affine layer={layer_index:02d} mode={mode}", flush=True
-            )
             scale, bias, fit_audit = fit_slimllm_output_affine(
                 layer.mlp.down_proj.weight,
                 hessian_statistics["layers"][layer_index],
@@ -293,6 +293,13 @@ def build_slimllm_plans(
                     "fit_audit": fit_audit,
                 }
             )
+        report_progress(
+            "SlimLLM plans",
+            layer_index + 1,
+            len(layers),
+            started_at,
+            detail=f"layer={layer_index:02d}",
+        )
         del scores
         if device.type == "cuda":
             torch.cuda.empty_cache()
