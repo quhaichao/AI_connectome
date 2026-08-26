@@ -2,7 +2,6 @@
 
 This repository contains the analysis and source-figure generation code accompanying the manuscript **“Early functional correlation facilitates learning in artificial neural networks.”**
 
-The code examines functional correlation (FC), structural connectivity (SC) and structural input similarity (IS) in multilayer perceptrons, convolutional neural networks, transformers and biological neural networks. It includes analyses corresponding to main Figs. 1–6 and Extended Data Figs. 1–8.
 
 ## Connectomic framework
 
@@ -10,7 +9,10 @@ The code examines functional correlation (FC), structural connectivity (SC) and 
 
 Figure 1 presents unified operational definitions of FC and SC across biological brain networks, multilayer perceptrons, convolutional neural networks and transformers. FC is calculated from correlations between regional or unit activity profiles, whereas SC is represented by anatomical connectivity, learned weights, convolutional-kernel-derived connections or Jacobian-estimated effective connectivity, depending on the system.
 
+
 ## Repository structure
+
+The code examines functional correlation (FC), structural connectivity (SC) and structural input similarity (IS) in multilayer perceptrons, convolutional neural networks, transformers and biological neural networks. It includes analyses corresponding to main Figs. 1–6 and Extended Data Figs. 1–8.
 
 - `experiments/`: analyses for the main figures and associated Extended Data figures
 - `supplementary/`: additional robustness and validation analyses
