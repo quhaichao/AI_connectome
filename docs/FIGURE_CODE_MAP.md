@@ -22,9 +22,9 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Fig. 5a–f | FC, gradient flow, receptive fields and masking | `experiments/06_mlp_gradient_optimization/fig5_fc_gradient_mechanism.ipynb` |
 | Fig. 5g–i | Optimizer, BatchNorm and FC-guided residual comparisons | `experiments/06_mlp_gradient_optimization/fig5_fc_guided_optimization.ipynb`; `mlp_early_high_fc_utils.py` |
 | Fig. 6a1–a4 | RoPE, residual, attention and normalization comparisons | Four `fig6a*.ipynb` notebooks under `experiments/07_transformer_architecture/`; `assemble_figure6a.py` |
-| Fig. 6b–c | FC-guided MoE construction and FC trajectories | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6b_c_fc_guided_moe.ipynb` |
-| Fig. 6d | Six-method MoE perplexity benchmark | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6d_moe_benchmark.ipynb` |
-| Fig. 6e | Expert semantic specialization | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6e_s8bc_expert_specialization.ipynb` |
+| Fig. 6b–c | FC-guided MoE construction and FC trajectories | `experiments/08_transformer_moe/fig6b_c_fc_guided_moe.ipynb` |
+| Fig. 6d | Six-method MoE perplexity benchmark | `experiments/08_transformer_moe/fig6d_moe_benchmark.ipynb` |
+| Fig. 6e | Expert semantic specialization | `experiments/08_transformer_moe/fig6e_s8bc_expert_specialization.ipynb` |
 | Fig. 6f | Stable high-FC redundancy | `experiments/09_transformer_pruning/scripts/collect_fc_matrices.py`; `analyze_fc_matrix_stability.py`; `plot_fc_layer_redundancy.py` |
 | Fig. 6g | FC-guided structured-pruning workflow | `experiments/09_transformer_pruning/src/fc_pruning/` |
 | Fig. 6h | Structured-pruning perplexity comparison | `experiments/09_transformer_pruning/fig6h_s8d_pruning_results.ipynb`; `FC_pruning_raw_results.csv` |
@@ -43,13 +43,13 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Extended Data Fig. 3c | CNN pair-level timing | `experiments/02_cnn_fc_is/cnn_fc_is_analysis.ipynb` |
 | Extended Data Fig. 3d | Transformer pair-level timing | `experiments/03_transformer_fc_is/transformer_fc_is_sc_analysis.py` |
 | Extended Data Fig. 3e–g | Cross-seed FC-before-IS robustness | `supplementary/supp_fig3_fc_before_is.ipynb` |
-| Extended Data Fig. 4a–b | Direct FC perturbations | `experiments/01_mlp_fc_is_dynamics/supp_fig4_fc_perturbation.ipynb` |
+| Extended Data Fig. 4 | Direct FC perturbations and independent-seed extension | `experiments/01_mlp_fc_is_dynamics/supp_fig4_fc_perturbation.ipynb`; `experiments/01_mlp_fc_is_dynamics/supp_fig4_fc_perturbation_multiseed.ipynb`; `experiments/01_mlp_fc_is_dynamics/supp_fig4_fc_perturbation_multiseed.py` |
 | Extended Data Fig. 5a–h | Multi-step and threshold sensitivity for Fig. 4 | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb`; `fig4d_20seeds.py --supplementary-suite` for seed-level masking robustness |
 | Extended Data Fig. 6a–d | Dataset generality of early/late FC roles | `experiments/05_mlp_functional_roles/fig4_early_late_fc_roles.ipynb`; `fig4d_20seeds.py --supplementary-suite` for Fashion-MNIST and CIFAR-10 masking |
 | Extended Data Fig. 6e–g | Stable/fluctuating FC frequency analyses | `experiments/05_mlp_functional_roles/fig4_frequency_learning.ipynb` |
 | Extended Data Fig. 7a–n | FC–gradient and optimization robustness | `supplementary/supp_fig7_fc_mechanism_robustness.ipynb`; `supplementary/utils/fig5_mechanism.py`; `fig5_robustness.py` |
-| Extended Data Fig. 8a | Expert-cluster-reordered FC matrices | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6b_c_fc_guided_moe.ipynb` |
-| Extended Data Fig. 8b–c | Layer-wise and seed-level expert specialization | `experiments/08_transformer_moe/MoE_benchmark_v2/fig6e_s8bc_expert_specialization.ipynb` |
+| Extended Data Fig. 8a | Expert-cluster-reordered FC matrices | `experiments/08_transformer_moe/fig6b_c_fc_guided_moe.ipynb` |
+| Extended Data Fig. 8b–c | Layer-wise and seed-level expert specialization | `experiments/08_transformer_moe/fig6e_s8bc_expert_specialization.ipynb` |
 | Extended Data Fig. 8d | Multi-ratio, multi-seed pruning results | `experiments/09_transformer_pruning/fig6h_s8d_pruning_results.ipynb`; `FC_pruning_raw_results.csv` |
 
 ## Suggested execution order
