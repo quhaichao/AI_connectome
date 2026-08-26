@@ -21,7 +21,7 @@ This index follows the current manuscript numbering (main Figs. 1–6 and Extend
 | Fig. 4k–m | Stable/fluctuating FC pairs in frequency learning | `experiments/05_mlp_functional_roles/fig4_frequency_learning.ipynb` |
 | Fig. 5a–f | FC, gradient flow, receptive fields and masking | `experiments/06_mlp_gradient_optimization/fig5_fc_gradient_mechanism.ipynb` |
 | Fig. 5g–i | Optimizer, BatchNorm and FC-guided residual comparisons | `experiments/06_mlp_gradient_optimization/fig5_fc_guided_optimization.ipynb`; `mlp_early_high_fc_utils.py` |
-| Fig. 6a1–a4 | RoPE, residual, attention and normalization comparisons | Four `fig6a*.ipynb` notebooks under `experiments/07_transformer_architecture/`; `assemble_figure6a.py` |
+| Fig. 6a1–a4 | RoPE, residual, attention and normalization comparisons | `experiments/07_transformer_architecture/fig6a1_rope_vs_sinusoidal.ipynb`; `fig6a2_hyperconnection_vs_residual.ipynb`; `fig6a3_hybrid_vs_standard_attention.ipynb`; `fig6a4_pre_norm_vs_post_norm.ipynb` |
 | Fig. 6b–c | FC-guided MoE construction and FC trajectories | `experiments/08_transformer_moe/fig6b_c_fc_guided_moe.ipynb` |
 | Fig. 6d | Six-method MoE perplexity benchmark | `experiments/08_transformer_moe/fig6d_moe_benchmark.ipynb` |
 | Fig. 6e | Expert semantic specialization | `experiments/08_transformer_moe/fig6e_s8bc_expert_specialization.ipynb` |

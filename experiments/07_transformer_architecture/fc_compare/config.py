@@ -34,12 +34,12 @@ class ModelConfig:
     mixer_pattern: tuple[str, ...] = field(default_factory=tuple)
     rope_base: float = 10_000.0
     hc_streams: int = 4
-    hc_dynamic_scale: float = 0.01
+    hc_dynamic_scale: float = 0.02
     hc_tanh: bool = True
     hc_adaptive_readout: bool = True
     mamba_d_state: int = 64
     mamba_d_conv: int = 4
-    mamba_expand: int = 2
+    mamba_expand: int = 4
     mamba_headdim: int = 64
 
     def resolved_mixers(self) -> tuple[str, ...]:
@@ -76,11 +76,34 @@ class TrainConfig:
     hc_lr_multiplier: float = 1.0
     hc_readout_lr_multiplier: float = 8.0
     use_bf16: bool = True
-    seeds: tuple[int, ...] = (11, 22, 33, 44, 55)
+    seeds: tuple[int, ...] = (11,)
     bootstrap_samples: int = 10_000
     confidence: float = 0.95
     deterministic: bool = True
     show_progress: bool = True
+
+
+# @dataclass(frozen=True)
+# class TrainConfig:
+#     max_steps: int = 2000
+#     eval_interval: int = 100
+#     fc_interval: int = 50
+#     learning_rate: float = 3e-4
+#     min_lr_ratio: float = 0.1
+#     warmup_steps: int = 200
+#     weight_decay: float = 0.1
+#     beta1: float = 0.9
+#     beta2: float = 0.95
+#     adam_eps: float = 1e-8
+#     grad_clip: float = 1.0
+#     hc_lr_multiplier: float = 1.0
+#     hc_readout_lr_multiplier: float = 8.0
+#     use_bf16: bool = True
+#     seeds: tuple[int, ...] = (11,)
+#     bootstrap_samples: int = 10_000
+#     confidence: float = 0.95
+#     deterministic: bool = True
+#     show_progress: bool = True
 
 
 @dataclass(frozen=True)
@@ -112,10 +135,11 @@ def paper_config(group: str, data_dir: Union[str, Path] = DEFAULT_DATA_DIR):
     if group == "a1":
         train = replace(
             train,
-            learning_rate=3.5e-4,
+            learning_rate=1e-4,
             warmup_steps=40,
             weight_decay=0.08,
             min_lr_ratio=0.10,
+            seeds=(11, 22, 33, 44, 55),
         )
         spec = ComparisonSpec(
             key="a1",
@@ -133,10 +157,10 @@ def paper_config(group: str, data_dir: Union[str, Path] = DEFAULT_DATA_DIR):
         # 24*176^2 is approximately 20*192^2. The smaller D also reduces FC cost.
         deeper = replace(
             common,
-            d_model=176,
-            n_heads=8,
-            d_ff=704,
-            n_layers=24,
+            # d_model=176,
+            # n_heads=8,
+            # d_ff=704,
+            n_layers=6,
         )
         spec = ComparisonSpec(
             key="a2",
@@ -155,26 +179,32 @@ def paper_config(group: str, data_dir: Union[str, Path] = DEFAULT_DATA_DIR):
         # revised PPL-only recipe is frozen and confirmed on untouched seeds.
         train = replace(
             train,
-            learning_rate=4.0e-4,
+            learning_rate=7e-5,
             warmup_steps=30,
             weight_decay=0.05,
             min_lr_ratio=0.15,
-            hc_lr_multiplier=1.0,
+            hc_lr_multiplier=6.0,
             hc_readout_lr_multiplier=8.0,
-            seeds=(121, 232, 343, 454, 565),
+            grad_clip=0.5,
+            seeds=(11, 22, 33, 44, 55),
         )
     elif group == "a3":
         train = replace(
             train,
-            learning_rate=2.5e-4,
-            warmup_steps=60,
+            learning_rate=5e-5,
+            warmup_steps=30,
             weight_decay=0.05,
             min_lr_ratio=0.10,
+            seeds=(11, 22, 33, 44, 55),
         )
         # Keep depth and FFN blocks fixed. Only the sequence mixer changes in the
         # even-numbered blocks; the official mamba_ssm.Mamba2 implementation is used.
         all_mha = ("mha",) * common.n_layers
-        hybrid = tuple("mha" if i % 2 == 0 else "mamba2" for i in range(common.n_layers))
+        # hybrid = tuple("mha" if i % 2 == 0 else "mamba2" for i in range(common.n_layers))
+        hybrid = (
+                    "mamba2", "mamba2", "mamba2", "mha",
+                    "mamba2", "mamba2", "mamba2", "mha",
+                )
         spec = ComparisonSpec(
             key="a3",
             title="Sequence mixer",
@@ -188,12 +218,14 @@ def paper_config(group: str, data_dir: Union[str, Path] = DEFAULT_DATA_DIR):
     elif group == "a4":
         train = replace(
             train,
-            learning_rate=2.0e-4,
-            warmup_steps=80,
-            weight_decay=0.10,
+            learning_rate=8e-5,
+            warmup_steps=100,
+            weight_decay=0.05,
             min_lr_ratio=0.20,
+            seeds=(11, 22, 33, 44, 55),
+
         )
-        deeper = replace(common, n_layers=12)
+        deeper = replace(common, n_layers=6)
         spec = ComparisonSpec(
             key="a4",
             title="Normalization placement",

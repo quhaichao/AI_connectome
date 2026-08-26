@@ -15,8 +15,8 @@ plt.rcParams["font.sans-serif"] = ["Arial", "DejaVu Sans", "Liberation Sans"]
 plt.rcParams["svg.fonttype"] = "none"
 plt.rcParams["pdf.fonttype"] = 42
 plt.rcParams["font.size"] = 7
-plt.rcParams["axes.spines.right"] = False
-plt.rcParams["axes.spines.top"] = False
+plt.rcParams["axes.spines.right"] = True
+plt.rcParams["axes.spines.top"] = True
 plt.rcParams["axes.linewidth"] = 0.8
 plt.rcParams["legend.frameon"] = False
 
@@ -34,6 +34,8 @@ GROUP_FIGURE_STEMS = {
     "a3": "a3_sequence_mixer",
     "a4": "a4_normalization_placement",
 }
+
+PPL_PLOT_START = 150
 
 
 def _matrix(summaries: list[dict], key: str, variant: str):
@@ -126,10 +128,10 @@ def _top_fc_title(aggregate: dict):
     percent = 100.0 * aggregate["fc_config"]["top_fraction"]
     selection = aggregate["fc_config"].get("layer_selection")
     if selection == "all":
-        return f"Mean top {percent:g}% FC across layers"
+        return f"Mean top {percent:g}% |FC| across layers"
     if isinstance(selection, int):
-        return f"Layer {selection} top {percent:g}% FC mean"
-    return f"Top {percent:g}% FC mean"
+        return f"Layer {selection} top {percent:g}% |FC| mean"
+    return f"Top {percent:g}% |FC| mean"
 
 
 def _draw_absolute_fc_panel(
@@ -142,7 +144,8 @@ def _draw_absolute_fc_panel(
         steps, values = _matrix(summaries, "fc_trajectory", variant)
         _line_with_interval(ax, steps, values, label, line_color)
     ax.set_title(_top_fc_title(aggregate))
-    ax.set_ylabel("FC")
+    ax.set_ylabel("|FC|")
+    ax.legend(loc="best")
 
 
 def _draw_delta_fc_panel(
@@ -165,17 +168,175 @@ def _draw_delta_fc_panel(
     ax.set_ylabel(r"$\Delta$FC from initialization")
 
 
-def _draw_ppl_panel(ax, spec, summaries: list[dict], aggregate: dict, color: str):
-    for variant, label, line_color in (
-        ("baseline", spec.baseline_label, BASELINE_COLOR),
-        ("optimized", spec.optimized_label, color),
-    ):
-        steps, values = _matrix(summaries, "validation_ppl_trajectory", variant)
-        _line_with_interval(ax, steps, values, label, line_color)
+# def _draw_ppl_panel(ax, spec, summaries: list[dict], aggregate: dict, color: str):
+#     for variant, label, line_color in (
+#         ("baseline", spec.baseline_label, BASELINE_COLOR),
+#         ("optimized", spec.optimized_label, color),
+#     ):
+#         steps, values = _matrix(summaries, "validation_ppl_trajectory", variant)
+#         _line_with_interval(ax, steps, values, label, line_color)
+#     ax.set_title("Validation perplexity")
+#     ax.set_ylabel("PPL")
+#     ax.set_yscale("log")
+#     ax.legend(loc="best")
+# def _draw_ppl_panel(ax, spec, summaries: list[dict], aggregate: dict, color: str):
+#     for variant, label, line_color in (
+#         ("baseline", spec.baseline_label, BASELINE_COLOR),
+#         ("optimized", spec.optimized_label, color),
+#     ):
+#         steps, values = _matrix(
+#             summaries,
+#             "validation_ppl_trajectory",
+#             variant,
+#         )
+#         keep = steps >= PPL_PLOT_START
+#         if not np.any(keep):
+#             raise ValueError(
+#                 f"No PPL checkpoints at or after step {PPL_PLOT_START}"
+#             )
+#         # 必须在绘图前过滤，否则隐藏的早期点仍会影响 y 轴自动范围
+#         steps = steps[keep]
+#         values = values[:, keep]
+
+#         _line_with_interval(
+#             ax,
+#             steps,
+#             values,
+#             label,
+#             line_color,
+#         )
+
+#     ax.set_title(f"Validation perplexity (steps ≥ {PPL_PLOT_START})")
+#     ax.set_xlabel("Training step")
+#     ax.set_ylabel("PPL")
+#     ax.set_yscale("log")
+#     ax.set_xlim(left=PPL_PLOT_START)
+#     ax.legend(loc="best")
+
+#     # aggregate 中是配对 test PPL 的中位数百分比变化：
+#     # 例如 -12.1 表示 optimized 的 PPL 降低了 12.1%
+#     percent_change = aggregate["ppl_comparison"]["median_percent_change"]
+
+#     if percent_change <= 0:
+#         effect_text = f"Test PPL: {-percent_change:.1f}% lower"
+#     else:
+#         effect_text = f"Test PPL: {percent_change:.1f}% higher"
+
+#     ax.text(
+#         0.98,
+#         0.06,
+#         effect_text,
+#         transform=ax.transAxes,
+#         ha="right",
+#         va="bottom",
+#         fontsize=6.5,
+#         fontweight="bold",
+#         color=color,
+#     )
+PPL_FOCUS_STEP = 100
+
+
+def _draw_ppl_panel(ax, spec, summaries, aggregate, color):
+    baseline_steps, baseline = _matrix(
+        summaries,
+        "validation_ppl_trajectory",
+        "baseline",
+    )
+    optimized_steps, optimized = _matrix(
+        summaries,
+        "validation_ppl_trajectory",
+        "optimized",
+    )
+
+    if not np.array_equal(baseline_steps, optimized_steps):
+        raise ValueError(
+            "baseline and optimized PPL trajectories must share steps"
+        )
+
+    # 绘制完整的 0–500 step 曲线
+    _line_with_interval(
+        ax,
+        baseline_steps,
+        baseline,
+        spec.baseline_label,
+        BASELINE_COLOR,
+    )
+    _line_with_interval(
+        ax,
+        optimized_steps,
+        optimized,
+        spec.optimized_label,
+        color,
+    )
+
+    # 使用 step >= 100 的数据决定合理的 y 轴范围
+    focus = baseline_steps >= PPL_FOCUS_STEP
+    if not np.any(focus):
+        raise ValueError(
+            f"No PPL checkpoints at or after step {PPL_FOCUS_STEP}"
+        )
+
+    focused_values = np.concatenate(
+        [
+            baseline[:, focus].reshape(-1),
+            optimized[:, focus].reshape(-1),
+        ]
+    )
+
+    # log y 轴使用乘法 margin
+    y_min = np.nanmin(focused_values) / 1.10
+    y_max = np.nanmax(focused_values) * 1.10
+
+    # ax.set_xlim(baseline_steps[0], baseline_steps[-1])
+    ax.set_ylim(y_min, y_max)
+    ax.set_yscale("log")
+    ax.set_xticks([0,100,200,300,400,500])
+
     ax.set_title("Validation perplexity")
     ax.set_ylabel("PPL")
-    ax.set_yscale("log")
     ax.legend(loc="best")
+
+    # 明确告诉读者早期高 PPL 超出了显示范围
+    early_values = np.concatenate(
+        [
+            baseline[:, ~focus].reshape(-1),
+            optimized[:, ~focus].reshape(-1),
+        ]
+    )
+
+    if early_values.size and np.nanmax(early_values) > y_max:
+        ax.text(
+            0.02,
+            0.98,
+            f"PPL > {y_max:,.0f} clipped",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=5.8,
+            color="#666666",
+        )
+
+    # Test PPL 改善百分比
+    percent_change = aggregate["ppl_comparison"][
+        "median_percent_change"
+    ]
+
+    if percent_change <= 0:
+        effect_text = f"Test PPL: {-percent_change:.1f}% lower"
+    else:
+        effect_text = f"Test PPL: {percent_change:.1f}% higher"
+
+    ax.text(
+        0.98,
+        0.06,
+        effect_text,
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=6.5,
+        fontweight="bold",
+        color=color,
+    )
 
 
 def _draw_ppl_ratio_panel(

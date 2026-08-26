@@ -21,7 +21,7 @@ def resolve_fc_layers(selection, n_layers: int) -> tuple[int, ...]:
 
 
 def _top_edge_summary(observations: torch.Tensor, config: FCConfig):
-    """Return the signed top-edge mean for a 2-D observation-by-unit matrix."""
+    """Return the mean magnitude of the strongest absolute FC edges."""
     observations = observations - observations.mean(dim=0, keepdim=True)
     std = observations.std(dim=0, unbiased=True)
     valid = torch.isfinite(std) & (std > config.min_feature_std)
@@ -39,8 +39,11 @@ def _top_edge_summary(observations: torch.Tensor, config: FCConfig):
     edges = edges[torch.isfinite(edges)]
     if edges.numel() == 0:
         raise ValueError("no finite off-diagonal FC values")
+
+    edge_magnitudes = edges.abs()
+
     k = max(1, math.ceil(config.top_fraction * edges.numel()))
-    top = torch.topk(edges, k=k, largest=True, sorted=False).values
+    top = torch.topk(edge_magnitudes, k=k, largest=True, sorted=False).values
     return {
         "top_fc_mean": float(top.mean().cpu()),
         "n_features": int(observations.shape[1]),
@@ -51,7 +54,7 @@ def _top_edge_summary(observations: torch.Tensor, config: FCConfig):
 
 
 def top_fc_mean(activations: torch.Tensor, config: FCConfig):
-    """Compute the signed mean of the largest 5% pairwise Pearson FC values.
+    """Compute the mean absolute magnitude of the strongest FC edges.
 
     ``activations`` is [sequences, tokens, features]. The primary estimator first
     z-scores each feature across sequences *within each token position*, then
