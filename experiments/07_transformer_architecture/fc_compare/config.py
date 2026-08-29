@@ -185,7 +185,7 @@ def paper_config(group: str, data_dir: Union[str, Path] = DEFAULT_DATA_DIR):
             min_lr_ratio=0.15,
             hc_lr_multiplier=6.0,
             hc_readout_lr_multiplier=8.0,
-            grad_clip=0.5,
+            grad_clip=1.0,
             seeds=(11, 22, 33, 44, 55),
         )
     elif group == "a3":

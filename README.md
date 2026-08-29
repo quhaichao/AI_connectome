@@ -1,6 +1,6 @@
-# Early functional correlation facilitates learning in artificial neural networks
+# Early functional correlation facilitates artificial neural network learning
 
-This repository contains the analysis and source-figure generation code accompanying the manuscript **“Early functional correlation facilitates learning in artificial neural networks.”**
+This repository contains the analysis and source-figure generation code accompanying the manuscript **“Early functional correlation facilitates artificial neural network learning.”**
 
 
 ## Connectomic framework
