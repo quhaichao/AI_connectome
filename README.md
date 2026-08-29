@@ -17,7 +17,6 @@ The code examines functional correlation (FC), structural connectivity (SC) and 
 - `experiments/`: analyses for the main figures and associated Extended Data figures
 - `supplementary/`: additional robustness and validation analyses
 - `requirements/`: dependency files for different experiment families
-- [`docs/FIGURE_CODE_MAP.md`](docs/FIGURE_CODE_MAP.md): figure-to-code correspondence
 
 ## Getting started
 
