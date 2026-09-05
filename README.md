@@ -1,6 +1,6 @@
-# Early functional correlation facilitates artificial neural network learning
+# Early functional connectome is critical for artificial network learning
 
-This repository contains the analysis and source-figure generation code accompanying the manuscript **“Early functional correlation facilitates artificial neural network learning.”**
+This repository contains the analysis and source-figure generation code accompanying the manuscript **“Early functional connectome is critical for artificial network learning.”**
 
 
 ## Connectomic framework
